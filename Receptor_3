@@ -65,6 +65,13 @@ void loop() {
     lastMillis = millis();
     countHigh = 0;
   }
-
+  
+  // Apagar automáticamente la alarma después de 30 segundos
+  if (alarmStartTime != 0 && millis() - alarmStartTime > alarmDuration) {
+    digitalWrite(34, LOW);
+    alarmStartTime = 0;
+    Serial.println("Alarm auto-reset after 30 seconds.");
+  }
+  
   delay(10); // Retardo para reducir carga de CPU y evitar muestreo excesivo
 }

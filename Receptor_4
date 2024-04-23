@@ -49,11 +49,13 @@ void setup() {
 }
 
 void loop() {
+  // Leer el estado del sensor
   if (digitalRead(32) == HIGH) {
-    countHigh++;
-    lastElectrodeDetectedTime = millis(); // Actualizamos con cada detección
+        countHigh++;
+        if (myData.flowStatus == 0) {
+            lastElectrodeDetectedTime = millis();  // Actualizar solo si el estado es FLOW OFF
+        }
   }
-
   if (millis() - lastMillis >= interval) {
     if (countHigh > threshold && myData.flowStatus == 1) {
       digitalWrite(34, LOW); // Apagar la alarma

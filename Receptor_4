@@ -43,6 +43,9 @@ void setup() {
   esp_now_register_recv_cb(OnDataRecv);
   pinMode(32, INPUT); // Pin del sensor
   pinMode(34, OUTPUT); // Pin de la alarma
+
+  digitalWrite(34, LOW); // Asegurarse de que la alarma está apagada al iniciar
+  countHigh = 0; 
 }
 
 void loop() {

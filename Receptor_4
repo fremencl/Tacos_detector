@@ -1,0 +1,75 @@
+#include <esp_now.h>
+#include <WiFi.h>
+
+// Estructura para recibir datos
+typedef struct struct_message {
+  int flowStatus; // 1 for FLOW ON, 0 for FLOW OFF
+} struct_message;
+
+struct_message myData;
+
+// Variables para manejar el conteo, evaluación del flujo y control de alarma
+unsigned long lastMillis = 0;
+unsigned long transitStartTime = 0;  // Tiempo cuando se detecta FLOW OFF en el emisor
+unsigned long alarmStartTime = 0;    // Tiempo cuando se activa la alarma
+int countHigh = 0;
+const int interval = 3000;           // Intervalo de 3 segundos para evaluar el sensor
+const int threshold = 10;            // Umbral de 10 electrodos para determinar "FLOW ON"
+const int transitTime = 30000;       // Tiempo de tránsito normal en milisegundos (30 segundos)
+const int alarmDuration = 30000;     // Duración de la alarma antes de apagarse automáticamente (30 segundos)
+
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  int previousStatus = myData.flowStatus;
+  memcpy(&myData, incomingData, sizeof(myData));
+  Serial.print("Flow Status Received: ");
+  Serial.println(myData.flowStatus);
+
+  if (previousStatus == 1 && myData.flowStatus == 0) {
+    transitStartTime = millis(); // Inicia el conteo cuando el emisor cambia a FLOW OFF
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+  
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  
+  esp_now_register_recv_cb(OnDataRecv);
+  pinMode(32, INPUT); // Pin del sensor
+  pinMode(34, OUTPUT); // Pin de la alarma
+  digitalWrite(34, LOW); // Asegura que la alarma está apagada al inicio
+}
+
+void loop() {
+  if (digitalRead(32) == HIGH) {
+    countHigh++;
+  }
+
+  if (millis() - lastMillis >= interval) {
+    if (countHigh > threshold) {
+      digitalWrite(34, LOW); // Apagar la alarma si hay flujo continuo
+      Serial.println("Normal operation: Sensor active.");
+    } else {
+      if (myData.flowStatus == 0 && millis() - transitStartTime < transitTime) {
+        digitalWrite(34, HIGH); // Activar alarma si el tiempo es menor que el tiempo de tránsito
+        alarmStartTime = millis(); // Comienza a contar el tiempo de alarma
+        Serial.println("Warning: Possible electrodes inside!");
+      }
+    }
+    lastMillis = millis();
+    countHigh = 0;
+  }
+
+  // Apagar automáticamente la alarma después de 30 segundos
+  if (alarmStartTime != 0 && millis() - alarmStartTime > alarmDuration) {
+    digitalWrite(34, LOW);
+    alarmStartTime = 0;
+    Serial.println("Alarm auto-reset after 30 seconds.");
+  }
+
+  delay(10); // Retardo para reducir carga de CPU y evitar muestreo excesivo
+}
